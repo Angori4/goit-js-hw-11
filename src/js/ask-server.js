@@ -20,7 +20,7 @@ export default class NewAskServer {
     return;
   }
   try {
-    const response = await axios.get(`${this.BASEURL}?key=32463298-aa2adc14f1416dd47ab6801d7&q=${this.name}&image_type=photo&orientation=horizontal&safesearch=true&per_page=${this.per_page}&page=${this.page}`);
+    const response = await axios.get(`${this.BASEURL}?key=33044994-c2ced58164f7879a8375986b7=${this.name}&image_type=photo&orientation=horizontal&safesearch=true&per_page=${this.per_page}&page=${this.page}`);
     const totalHits = await response.data.totalHits;
     console.log(totalHits);
     this.incrementPage();
@@ -36,10 +36,9 @@ export default class NewAskServer {
   }
 
   incrementPage() {
-    this.numberCard *=this.page;
-    console.log(this.numberCard);
     this.page += 1;
   }
+  
   resetPage() {
     this.page = 1;
   }

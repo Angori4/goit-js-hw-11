@@ -1,115 +1,156 @@
-// імпорти
+import Notiflix from 'notiflix';
+import SimpleLightbox from 'simplelightbox';
 
-import NewAskServer from "./js/ask-server";
-export { renderImgGallery };
-import SimpleLightbox from "simplelightbox";
-import "simplelightbox/dist/simple-lightbox.min.css";
-import Notiflix from "notiflix";
+import NewAskServer from './js/ask-server';
 
-// елементи
-const btnSubmit = document.querySelector('button');
-const gallery = document.querySelector('.gallery');
-const btnLoadMore = document.querySelector('.load-more'); 
+
+import 'simplelightbox/dist/simple-lightbox.min.css';
+
+let useInfiniteScroll = false;
 
 const newAskServer = new NewAskServer();
-let galleryOpenModal = new SimpleLightbox('.gallery a');
-// подія сабміт
-btnSubmit.addEventListener('click', async (e) => {
-  e.preventDefault();
-  btnLoadMore.classList.replace('is-visible', 'is-hidden');
-  clearArticlesContainer();
- 
-  try {
-    newAskServer.resetPage();
-    const data = await newAskServer.fetchArticles();
 
-    const hits = await data.data.hits;
-    const totalHits = await data.data.totalHits;
+const refs = {
+  formSearch:    document.querySelector('#search-form'),
+  gallery:       document.querySelector('.gallery'),
+  btnSearch:     document.querySelector('button[type="submit"]'),
+  btnLoadMore:   document.querySelector('button.load-more'),
+  finishText:    document.querySelector('.finish-text'),
+  guardDiv:      document.querySelector('.js-guard'),
+  infiniteCheck: document.querySelector('.infinite-scroll-check'),
+};
 
-    Notiflix.Notify.info(`Hooray! We found ${totalHits} images.`);
-
-    renderImgGallery(hits);
-     btnLoadMore.classList.replace('is-hidden', 'is-visible');
-    galleryOpenModal.refresh()
-     
-  } catch (error) {
-    console.log(error.message);
-  }
-});
-
-// функція рендеру галереї
-function renderImgGallery(hits) {
-  if (hits.length === 0) {
-    Notiflix.Notify.failure("Sorry, there are no images matching your search query. Please try again.");
-    btnLoadMore.classList.replace('is-visible', 'is-hidden');
-    return;
-  }
- 
-  const markup = hits
-    .map(
-        (({ webformatURL, largeImageURL, tags, likes, views, comments, downloads }) => {
-        return `
-        <div class="photo-card gallery__item">
-        <a class="gallery__link" href="${largeImageURL}" style ="display:inline-block; text-decoration:none; color:black;">
-   <img class="gallery__image" src="${webformatURL}" alt="${tags}" loading="lazy" />
-      <div class="info">
-        <p class="info-item">
-          <b>Likes</b>${likes}
-        </p>
-        <p class="info-item">
-          <b>Views</b>${views}
-        </p>
-        <p class="info-item">
-          <b>Comments</b>${comments}
-        </p>
-        <p class="info-item">
-          <b>Downloads</b>${downloads}
-        </p>
-      </div></a>
-      </div> `;
-      }))
- 
-    .join(" ");
-  gallery.insertAdjacentHTML('beforeend', markup);
-
-  const { height: cardHeight } = document
-  .querySelector(".gallery")
-  .firstElementChild.getBoundingClientRect();
-
-window.scrollBy({
-  top: cardHeight * 0.25,
-  behavior: "smooth",
-});
+if (Object.values(refs).some(el => !el)) {
+  throw new Error('Error: invalid markup!');
 }
 
-// подія показати більше
-btnLoadMore.addEventListener('click', async (e) => {
-  e.preventDefault();
+const observerOpts = {
+  root: null,
+  rootMargin: '300px',
+  threshold: 1.0
+}
 
-  try {
-    const data = await newAskServer.fetchArticles();
-    const hits = await data.data.hits;
-    renderImgGallery(hits);
-    let galleryOpenModal = new SimpleLightbox('.gallery a');
-    galleryOpenModal.on('show.simplelightbox', function () {
-    });
-    // ? refresh SimpleLightbox???npm 
-    galleryOpenModal.refresh();
-  } catch (error) {
-    console.log(error.message);
+const onObserve = (entries, observer) => {
+  entries.forEach(entry => {
+    if (entry.isIntersecting) {
+      onLoadMore();
+    }
+  });
+}
+
+const observer = new IntersectionObserver(onObserve, observerOpts);
+
+const lightboxOpts = {
+  captionsData: 'alt',
+  captionPosition: 'bottom',
+  captionDelay: 250,
+};
+
+const lightbox = new SimpleLightbox('.gallery .gallery__link', lightboxOpts);
+
+refs.formSearch.addEventListener('submit', onSearch);
+refs.btnLoadMore.addEventListener('click', onLoadMore);
+
+function onSearch(evt) {
+  evt.preventDefault();
+
+  const searchQuery = evt.currentTarget.elements.searchQuery.value.trim();
+  
+  if (!searchQuery) {
+    Notiflix.Notify.failure('Please enter a search query!');
+    return;
   }
-});
 
-// функція онулення сторніки
-function clearArticlesContainer() {
-  gallery.innerHTML = " ";
+  useInfiniteScroll = refs.infiniteCheck.checked;
+  refs.infiniteCheck.disabled = true;
+
+  initQuery(searchQuery);
+  performQuery();
+}
+
+function onLoadMore() {
+  searchService.incrementPage();
+  performQuery();
+}
+
+function initQuery(searchQuery) {
+  newAskServer.setNewQuery(searchQuery);
+  refs.gallery.innerHTML = '';
+  if (useInfiniteScroll) {
+    observer.unobserve(refs.guardDiv);
+  } else {
+    refs.btnLoadMore.classList.add('is-hidden');
+  }
+  refs.finishText.classList.add('is-hidden');
+}
+
+async function performQuery() {
+  try {
+    refs.btnSearch.disabled = true;
+    refs.btnLoadMore.disabled = true;
+
+    const data = await searchService.getNextData();
+
+    if (!data || (data.length == 0)) {
+      Notiflix.Notify.failure('Sorry, there are no images matching your search query. Please try again.');
+      return;
+    }
+      
+    if (searchService.page === 1) {
+      Notiflix.Notify.success(`Hooray! We found ${searchService.resultsQty} images.`);
+      if (useInfiniteScroll) {
+        observer.observe(refs.guardDiv);
+      }
+    }
+
+    refs.gallery.insertAdjacentHTML('beforeend', createGalleryMarkup(data));
+
+    refreshPage();
+
+  } catch (err) {
+    console.error(err);
+  } finally {
+    refs.btnSearch.disabled   = false;
+    refs.btnLoadMore.disabled = false;
+  }
+}
+
+function createGalleryMarkup(data) {
+  return data.map(({webformatURL, largeImageURL, tags, likes, views, comments, downloads}) => `
+    <li class="gallery__item">
+      <a class="gallery__link" href="${largeImageURL}">
+        <div class="gallery__thumb">
+          <img 
+            class="gallery__image"
+            src="${webformatURL}"
+            data-source="${largeImageURL}"
+            alt="${tags}"
+            loading="lazy" />
+        </div>    
+        <div class="gallery__info">
+          <p class="info__item">
+            <b>Likes</b><br>${likes}
+          </p>
+          <p class="info__item">
+            <b>Views</b><br>${views}
+          </p>
+          <p class="info__item">
+            <b>Comments</b><br>${comments}
+          </p>
+          <p class="info__item">
+            <b>Downloads</b><br>${downloads}
+          </p>
+        </div>
+      </a>
+    </li>
+  `).join('');
 }
 
 function refreshPage() {
 
   lightbox.refresh();
 
-  if (searchService.isLastPage()) {
+  if (newAskServer.isLastPage()) {
     if (useInfiniteScroll) {
       observer.unobserve(refs.guardDiv);
     } else {

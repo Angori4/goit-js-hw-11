@@ -1,3 +1,4 @@
+import './index.html'
 import './css/styles.css'
 import { fetchImages } from './js/fetch-images'
 import { renderGallery } from './js/render-gallery'

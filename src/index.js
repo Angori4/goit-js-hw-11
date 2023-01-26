@@ -12,7 +12,7 @@ const gallery = document.querySelector('.gallery');
 const btnLoadMore = document.querySelector('.load-more'); 
 
 const newAskServer = new NewAskServer();
-
+let galleryOpenModal = new SimpleLightbox('.gallery a');
 // подія сабміт
 btnSubmit.addEventListener('click', async (e) => {
   e.preventDefault();
@@ -30,9 +30,8 @@ btnSubmit.addEventListener('click', async (e) => {
 
     renderImgGallery(hits);
      btnLoadMore.classList.replace('is-hidden', 'is-visible');
-    let galleryOpenModal = new SimpleLightbox('.gallery a');
-      galleryOpenModal.on('show.simplelightbox', function () {
-});
+    galleryOpenModal.refresh()
+     
   } catch (error) {
     console.log(error.message);
   }

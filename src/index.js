@@ -104,3 +104,32 @@ btnLoadMore.addEventListener('click', async (e) => {
 function clearArticlesContainer() {
   gallery.innerHTML = " ";
 }
+
+function refreshPage() {
+
+  lightbox.refresh();
+
+  if (searchService.isLastPage()) {
+    if (useInfiniteScroll) {
+      observer.unobserve(refs.guardDiv);
+    } else {
+      refs.btnLoadMore.classList.add('is-hidden');
+    }
+    refs.finishText.classList.remove('is-hidden');
+  } else {
+    if (!useInfiniteScroll) {
+      refs.btnLoadMore.classList.remove('is-hidden');
+    }
+    refs.finishText.classList.add('is-hidden');
+  }
+ 
+  if ((searchService.page > 1) && !useInfiniteScroll) {   
+
+    const { height: cardHeight } = refs.gallery.firstElementChild.getBoundingClientRect();
+
+    window.scrollBy({
+      top: cardHeight * 2,
+      behavior: "smooth",
+    });
+  }
+}

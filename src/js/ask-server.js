@@ -1,50 +1,47 @@
-import axios from 'axios';
+import axios from "axios";
 import Notiflix from "notiflix";
 
-const BASE_URL = 'https://pixabay.com/api/';
-const KEY_API  = '33044994-c2ced58164f7879a8375986b7';
+const input = document.querySelector('input');
+const btnLoadMore = document.querySelector('.load-more');
 
-export default class SearchService {
-  searchQuery;
-  page;
-  per_page;
-  resultsQty;
-  pagesQty;
-
-  constructor(searchQuery = '', per_page = 40) {
-    this.setNewQuery(searchQuery, per_page);
+export default class NewAskServer {
+  constructor(){
+    this.page = 1;
+    this.name = " ";
   }
 
-  setNewQuery(newQuery, per_page = 40) {
-    this.searchQuery = newQuery;
-    this.page = 1;
-    this.per_page = per_page;
+  async fetchArticles() {
+    this.BASEURL = 'https://pixabay.com/api/';
+    this.name = input.value.trim();
+    this.per_page = 40;
+    this.numberCard = this.per_page;
+
+  if (this.name.length === 0) {
+    return;
+  }
+  try {
+    const response = await axios.get(`${this.BASEURL}?key=33044994-c2ced58164f7879a8375986b7=${this.name}&image_type=photo&orientation=horizontal&safesearch=true&per_page=${this.per_page}&page=${this.page}`);
+    const totalHits = await response.data.totalHits;
+    console.log(totalHits);
+    this.incrementPage();
+    if (this.numberCard > totalHits) {
+      Notiflix.Notify.info("We're sorry, but you've reached the end of search results.");
+      btnLoadMore.classList.replace('is-visible', 'is-hidden');
+
+  }
+    return response;
+  } catch (error) {
+    console.log(error);
+  }
   }
 
   incrementPage() {
+    this.numberCard *=this.page;
+    console.log(this.numberCard);
     this.page += 1;
   }
-
-  isLastPage() {
-    return !(this.page < this.pagesQty);
+  resetPage() {
+    this.page = 1;
   }
 
-  async getNextData() {
-    const searchParams = new URLSearchParams({
-      key: KEY_API,
-      q: this.searchQuery,
-      image_type: 'photo',
-      orientation: 'horizontal',
-      safesearch: 'true',
-      page: this.page,
-      per_page: this.per_page,
-    });
-
-    const resp = await axios.get(`${BASE_URL}?${searchParams}`); 
-    
-    this.resultsQty = resp.data.totalHits;
-    this.pagesQty = Math.ceil(this.resultsQty / this.per_page);
-    
-    return resp.data.hits;
-  }
 }

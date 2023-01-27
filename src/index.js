@@ -1,99 +1,58 @@
-import { pixabayAPI } from "./js/fetch"
-import axios from "axios";
+import { refs } from './js/refs';
+import { PixabayAPI } from './js/pixabayApi';
+import { creatMarkup } from './js/creatMarkup';
 import Notiflix from 'notiflix';
-import SimpleLightbox from "simplelightbox";
-import "simplelightbox/dist/simple-lightbox.min.css";
+import { observer } from './js/observer';
+import 'simplelightbox/dist/simple-lightbox.min.css';
+import { andSearch } from './js/observer';
+import * as scroll from './js/btn-scroll';
 
+refs.form.addEventListener('submit', onSearch);
 
-const btnSearch = document.querySelector(".search-form-button");
-const input = document.querySelector(".search-form-input");
-const gallery = document.querySelector(".gallery");
-const btnLoadMore = document.querySelector(".load-more");
+export const pixabayAPI = new PixabayAPI();
 
-let gallerySimpleLightbox = new SimpleLightbox('.gallery a');
+function onSearch(event) {
+  event.preventDefault();
 
-let page = 0;
-let perPage = 40;
-let inputValue = input.value;
+  const searchQuery = event.currentTarget.searchQuery.value.trim();
 
-
-btnSearch.addEventListener('click', onSearch);
-btnLoadMore.addEventListener('click', onLoadMore);
-
-  function onSearch(event) {
-   event.preventDefault()
-   inputValue = input.value.trim();
-  if (!inputValue) {
-    gallery.innerHTML = ""; 
-    return
+  if (!searchQuery) {
+    Notiflix.Notify.info('Enter data to search, please!');
+    return;
   }
-    page = 1;
-    btnLoadMore.hidden = true;
-  pixabayAPI(inputValue, page, perPage)
+
+  refs.gallery.innerHTML = '';
+  pixabayAPI.resetPage();
+
+  pixabayAPI.queru = searchQuery;
+  pixabayAPI
+    .getPhotos()
     .then(data => {
-      if (data.hits.length === 0) {
-        Notiflix.Notify.failure(
-          'Sorry, there are no images matching your search query. Please try again.');
-        gallery.innerHTML = "";
-        btnLoadMore.hidden = true;
-        return;
-      } else {
-        gallery.innerHTML = "";
-        markupGallery(data.hits);
-        Notiflix.Notify.success(
-          `Hooray! We found ${data.totalHits} images.`
+      creatMarkup(data);
+
+      if (data.totalHits === 0) {
+        Notiflix.Notify.warning(
+          'Sorry, there are no images matching your search query. Please try again.'
         );
-        gallerySimpleLightbox.refresh();
-        btnLoadMore.hidden = false;
-        
-        const { height: cardHeight } = document.
-          querySelector(".gallery").
-          firstElementChild.getBoundingClientRect();
-
-         window.scrollBy({
-         top: cardHeight * -1,
-         behavior: "smooth",
-         });
+        return;
       }
-    }).catch(err => console.log(err));
-    
-}
 
-function onLoadMore() {
-  page += 1
-  inputValue = input.value.trim();
- 
-  pixabayAPI(inputValue, page, perPage).then(data => {
-    markupGallery(data.hits);
-    let totalPages = data.totalHits / perPage;
-    gallerySimpleLightbox.refresh();
-    
-    if (page >= totalPages) {
-      btnLoadMore.hidden = true;
-      Notiflix.Notify.info("We're sorry, but you've reached the end of search results.") 
-    }
-  })
-    .catch(err => console.log(err))
-}
+      if (data.totalHits !== 0) {
+        Notiflix.Notify.success(`Hooray! We found ${data.totalHits} images.`);
+      }
 
-function markupGallery(images) {
-  const markup = images.map(({ webformatURL, largeImageURL, tags, likes, views, comments, downloads }) => 
-  `<div class="photo-card">
-  <a href="${largeImageURL}"><img class="photo"  src="${webformatURL}" alt="${tags}" loading="lazy" /></a>
-  <div class="info">
-    <p class="info_item">
-      <b>Likes</b><span class="info_item-api">${likes}</span>
-    </p>
-    <p class="info_item">
-      <b>Views</b><span class="info_item-api">${views}</span>
-    </p>
-    <p class="info_item">
-      <b>Comments</b><span class="info_item-api">${comments}</span>
-    </p>
-    <p class="info_item">
-      <b>Downloads</b><span class="info_item-api">${downloads}</span>
-    </p>
-  </div>
-</div>`).join('');
-  gallery.insertAdjacentHTML("beforeend",markup);
+      if (data.totalHits <= 40) {
+        andSearch();
+      }
+
+      pixabayAPI.setTotalPhotos(data.totalHits);
+      const hasMore = pixabayAPI.hasMorePhotos();
+      if (hasMore) {
+        const item = document.querySelector('.gallery__item:last-child');
+        observer.observe(item);
+      }
+    })
+    .catch(error => console.log(error));
+
+  refs.form.reset();
 }
